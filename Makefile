@@ -6,9 +6,9 @@
 #
 ############################################################ IDENT(1)
 #
-# $Title: bhotkey-display-common - shared RandR subroutines $
+# $Title: bhotkeys-display-common - shared display layouts $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys-display-common/Makefile 2026-10-03 19:50:53 -0700 Devin Teske $
+# $FrauBSD: bhotkeys-display-common/Makefile 2026-10-03 20:37:23 -0700 Devin Teske $
 #
 ############################################################ PATHS
 
