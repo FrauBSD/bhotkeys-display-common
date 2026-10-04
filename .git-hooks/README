@@ -1,4 +1,4 @@
-# $FrauBSD: condy/.git-hooks/README 2020-01-25 17:58:29 -0800 freebsdfrau $
+# $FrauBSD: bhotkeys-display-common/.git-hooks/README 2026-10-03 19:28:02 -0700 Devin Teske $
 
 !! ATTENTION DEVELOPERS AND CONTRIBUTORS !!
 
@@ -11,13 +11,13 @@ Cheers!
 
 Supported keywords:
 
-	$Author: freebsdfrau $
-	$Branch: master $
-	$Date: 2020-01-25 17:58:29 -0800 $
-	$Header: .git-hooks/README 2020-01-25 17:58:29 -0800 freebsdfrau $
-	$Origin: https://github.com/FrauBSD/condy.git $
-	$Project: //github.com/FrauBSD/condy.git $
+	$Author: Devin Teske $
+	$Branch: main $
+	$Date: 2026-10-03 19:28:02 -0700 $
+	$Header: .git-hooks/README 2026-10-03 19:28:02 -0700 Devin Teske $
+	$Origin: git@github.com:FrauBSD/bhotkeys-display-common.git $
+	$Project: FrauBSD/bhotkeys-display-common.git $
 	$RCSfile: README $
 	$Source: .git-hooks/README $
-	$FrauBSD: condy/.git-hooks/README 2020-01-25 17:58:29 -0800 freebsdfrau $
+	$FrauBSD: bhotkeys-display-common/.git-hooks/README 2026-10-03 19:28:02 -0700 Devin Teske $
 

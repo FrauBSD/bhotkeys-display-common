@@ -3,7 +3,7 @@
 #
 # $Title: Script to enable client side hooks $
 # $Copyright: 2017 Devin Teske. All rights reserved. $
-# $FrauBSD: condy/.git-hooks/install.sh 2020-01-25 17:58:29 -0800 freebsdfrau $
+# $FrauBSD: bhotkeys-display-common/.git-hooks/install.sh 2026-10-03 19:28:02 -0700 Devin Teske $
 #
 ############################################################ GLOBALS
 
