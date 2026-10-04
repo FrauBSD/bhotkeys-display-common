@@ -1,10 +1,10 @@
-[//]: # ($FrauBSD: bhotkeys-display-common/README.md 2026-10-03 19:50:53 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys-display-common/README.md 2026-10-03 20:36:54 -0700 Devin Teske $)
 
-# bhotkey-display-common
+# bhotkeys-display-common
 
 Shared RandR subroutines for laptop, mirror, and extend layouts.
 
-Home: [FrauBSD/bhotkey-display-common](https://github.com/FrauBSD/bhotkey-display-common)
+Home: [FrauBSD/bhotkeys-display-common](https://github.com/FrauBSD/bhotkeys-display-common)
 
 ## Build / install
 
