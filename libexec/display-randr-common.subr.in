@@ -1,0 +1,507 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: RandR subroutines for laptop, mirror, and extend $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD: bhotkeys-display-common/libexec/display-randr-common.subr.in 2026-10-03 19:50:53 -0700 Devin Teske $
+#
+############################################################ INFORMATION
+#
+# Shared RandR helpers for display-mirror-toggle, display-extend,
+# and display-laptop-only. Sourced from
+# @PREFIX@/libexec/bhotkeys/display-randr-common.subr.
+#
+############################################################ CONFIG
+
+case "$0" in
+*.subr) exit 0 ;;
+esac
+
+############################################################ GLOBALS
+
+DISPLAY="${DISPLAY:-:0}"
+export DISPLAY
+
+STATE_MIRROR="${STATE_MIRROR:-$HOME/.cache/display-mirror-on}"
+STATE_EXTEND="${STATE_EXTEND:-$HOME/.cache/display-extend-on}"
+
+#
+# Last chosen display mode across logout/login:
+#   laptop | mirror | extend:left|right|above | layout
+#
+STATE_MODE="${STATE_MODE:-$HOME/.cache/display-mode}"
+
+LOG="${DISPLAY_LOG:-/tmp/display-randr.log}"
+
+XRANDR=$( command -v xrandr ) || {
+	printf "%s xrandr missing\n" "$( date '+%Y-%m-%d %H:%M:%S' )" >> "$LOG"
+	exit 1
+}
+
+#
+# Cached xrandr --query. Each live query is about 1s on this hardware.
+# Must be filled in the parent shell: $( helper ) subshells inherit the
+# cache for reads but cannot publish a new cache back to the parent.
+#
+_DISPLAY_XRANDR_Q=
+
+############################################################ FUNCTIONS
+
+quietly() { "$@" > /dev/null 2>&1; }
+have() { quietly command -v "$@"; }
+
+display_log()
+{
+	printf "%s %s\n" "$( date '+%Y-%m-%d %H:%M:%S' )" "$*" >> "$LOG"
+}
+
+display_xrandr_invalidate()
+{
+	_DISPLAY_XRANDR_Q=
+}
+
+# Warm or refresh the query cache in the current shell (not inside $())
+display_xrandr_cache()
+{
+	_DISPLAY_XRANDR_Q=$( $XRANDR --query ) || return 1
+}
+
+display_xrandr_q()
+{
+	if [ ! "$_DISPLAY_XRANDR_Q" ]; then
+		display_xrandr_cache || return 1
+	fi
+	printf "%s\n" "$_DISPLAY_XRANDR_Q"
+}
+
+# Run an xrandr configure command and drop the query cache
+display_xrandr_apply()
+{
+	display_log "XRANDR: $*"
+	"$@" || {
+		display_xrandr_invalidate
+		return 1
+	}
+	display_xrandr_invalidate
+}
+
+display_output_rank()
+{
+	case "$1" in
+	DP-*) printf "1\n" ;;
+	HDMI-*) printf "2\n" ;;
+	HDMI*) printf "3\n" ;;
+	VGA-*) printf "4\n" ;;
+	DVI-*) printf "5\n" ;;
+	*) printf "9\n"
+	esac
+}
+
+display_pick_primary()
+{
+	display_xrandr_q | awk '
+		/^[^ ]/ {
+			split($1, a, "+")
+			name = a[1]
+			state = $2
+			if (state != "connected") next
+			if (name ~ /^(eDP|LVDS|DSI)-/) { print name; exit }
+			if ($3 == "primary") pri = name
+		}
+		END { if (pri != "") print pri }
+	' # END-QUOTE
+}
+
+display_list_externals()
+{
+	local primary="$1"
+
+	display_xrandr_q | awk -v pri="$primary" '
+		/^[^ ]/ {
+			split($1, a, "+")
+			name = a[1]
+			if ($2 != "connected") next
+			if (name == pri) next
+			if (name ~ /^(eDP|LVDS|DSI)-/) next
+			print name
+		}
+	' # END-QUOTE
+}
+
+display_list_all_externals()
+{
+	local primary="$1"
+
+	display_xrandr_q | awk -v pri="$primary" '
+		/^[^ ]/ {
+			split($1, a, "+")
+			name = a[1]
+			# "Screen 0:" is a summary line, not an output
+			if (name == "Screen") next
+			if (name ~ /^(eDP|LVDS|DSI)-/) next
+			if (name == pri) next
+			print name
+		}
+	' # END-QUOTE
+}
+
+display_externals_active()
+{
+	local primary="$1"
+
+	#
+	# Any non-panel output with a programmed CRTC (connected, or a
+	# disconnected hot-unplug ghost still holding 1920x1200+0+0).
+	#
+	display_xrandr_q | awk -v pri="$primary" '
+		/^[^ ]/ {
+			split($1, a, "+")
+			name = a[1]
+			if (name == "Screen") next
+			if (name == pri) next
+			if (name ~ /^(eDP|LVDS|DSI)-/) next
+			for (i = 2; i <= NF; i++)
+				if ($i ~ /^[0-9]+x[0-9]+\+[0-9]+\+[0-9]+/) {
+					active = 1
+					break
+				}
+		}
+		END { exit(active ? 0 : 1) }
+	' # END-QUOTE
+}
+
+display_sort_externals()
+{
+	local externals="$1"
+	local sorted=
+	local out rank
+
+	for out in $externals; do
+		rank=$( display_output_rank "$out" )
+		sorted="$sorted
+$rank:$out"
+	done
+	printf "%s\n" "$sorted" | sort -n |
+		awk -F: 'NF > 1 { sub(/^[^:]*:/, ""); print }'
+}
+
+display_screen_width()
+{
+	display_xrandr_q | awk '/^Screen 0/ {
+		for (i = 1; i <= NF; i++)
+			if ($i == "current") {
+				print $(i + 1)
+				exit
+			}
+		}
+	' # END-QUOTE
+}
+
+#
+# Active CRTC geometry token: WIDTHxHEIGHT+X+Y (skips the "primary"
+# keyword). Includes disconnected outputs that still have a programmed
+# CRTC (hot-unplug ghosts). Those must be --off'd or they block
+# reconnect and confuse toggle.
+#
+display_output_geometry()
+{
+	local out="$1"
+
+	display_xrandr_q | awk -v o="$out" '
+		$1 == o {
+			for (i = 2; i <= NF; i++) {
+				if ($i ~ /^[0-9]+x[0-9]+\+[0-9]+\+[0-9]+/) {
+					print $i
+					exit
+				}
+			}
+		}
+	' # END-QUOTE
+}
+
+display_primary_width()
+{
+	local geom wh
+
+	geom=$( display_output_geometry "$1" )
+	[ "$geom" ] || return 1
+
+	wh="${geom%%+*}"
+
+	printf "%s\n" "${wh%x*}"
+}
+
+# Current mode marked with * under an output, e.g. 1920x1200
+display_output_current_mode()
+{
+	local out="$1"
+
+	display_xrandr_q | awk -v o="$out" '
+		$1 == o { want = 1; next }
+		want && /^[^[:space:]]/ { exit }
+		want && $1 ~ /^[0-9]+x[0-9]+/ && index($0, "*") {
+			print $1
+			exit
+		}
+	' # END-QUOTE
+}
+
+# Primary panel origin as "X Y" for Conky placement
+display_primary_origin()
+{
+	local geom rest x y
+
+	geom=$( display_output_geometry "$1" )
+	[ "$geom" ] || return 1
+
+	rest="${geom#*+}"
+	x="${rest%%+*}"
+	y="${rest#*+}"
+
+	printf "%s %s\n" "$x" "$y"
+}
+
+display_clear_mirror()
+{
+	rm -f "$STATE_MIRROR"
+}
+
+display_clear_extend()
+{
+	rm -f "$STATE_EXTEND"
+}
+
+display_clear_modes()
+{
+	display_clear_mirror
+	display_clear_extend
+}
+
+display_mode_set()
+{
+	local dir
+
+	dir=$( dirname "$STATE_MODE" )
+	mkdir -p "$dir"
+	printf "%s\n" "$1" > "$STATE_MODE"
+
+	# Greeter (root) must not leave root-owned mode files in the user cache
+	if [ "${MENU_HOTKEYS_GREETER-}${DISPLAY_GREETER-}" ] &&
+	   [ "${FLORENCE_GREETER_USER-}" ]
+	then
+		chown "$FLORENCE_GREETER_USER:$FLORENCE_GREETER_USER" \
+			"$STATE_MODE" 2> /dev/null || : chown ignored
+	fi
+}
+
+display_mode_get()
+{
+	[ -f "$STATE_MODE" ] && cat "$STATE_MODE" || : no mode
+}
+
+#
+# True when some connected external CRTC is active but not a same-as
+# clone of the primary (arandr or an extend desk)
+#
+display_is_extended()
+{
+	local primary="$1"
+	local pg pox poy out og ox oy
+
+	pg=$( display_output_geometry "$primary" )
+	[ "$pg" ] || return 1
+	pox="${pg#*+}"
+	pox="${pox%%+*}"
+	poy="${pg##*+}"
+
+	for out in $( display_list_externals "$primary" ); do
+		og=$( display_output_geometry "$out" )
+		[ "$og" ] || continue
+		ox="${og#*+}"
+		ox="${ox%%+*}"
+		oy="${og##*+}"
+		[ "$ox" != "$pox" ] || [ "$oy" != "$poy" ] && return 0
+	done
+
+	return 1
+}
+
+# Screen 0 current size as WIDTHxHEIGHT
+display_screen_size()
+{
+	display_xrandr_q | awk '/^Screen 0/ {
+		for (i = 1; i <= NF; i++)
+			if ($i == "current") {
+				w = $(i + 1)
+				h = $(i + 3)
+				gsub(/,/, "", h)
+				print w "x" h
+				exit
+			}
+	}'
+}
+
+#
+# Bounding box of active CRTCs (outputs with WIDTHxHEIGHT+X+Y), as WxH.
+# Used to shrink a leftover framebuffer after arandr or --off leaves
+# Screen larger than any lit panel (FVWM then treats that ghost area
+# as one page).
+#
+display_active_framebuffer_size()
+{
+	display_xrandr_q | awk '
+		/ connected/ {
+			for (i = 1; i <= NF; i++) {
+				if ($i ~ /^[0-9]+x[0-9]+\+[0-9]+\+[0-9]+$/) {
+					split($i, a, /[x+]/)
+					r = a[3] + a[1]
+					b = a[4] + a[2]
+					if (r > maxx) maxx = r
+					if (b > maxy) maxy = b
+				}
+			}
+		}
+		END {
+			if (maxx > 0 && maxy > 0)
+				print maxx "x" maxy
+		}
+	' # END-QUOTE
+}
+
+#
+# Match Screen 0 to the active-CRTC bounding box. xrandr --output ...
+# --off often leaves the previous extend or mirror framebuffer intact.
+#
+display_normalize_framebuffer()
+{
+	local need have
+
+	need=$( display_active_framebuffer_size ) || return 0
+	[ "$need" ] || return 0
+	have=$( display_screen_size )
+	[ "$have" ] || return 0
+	[ "$need" = "$have" ] && return 0
+	display_log "framebuffer normalize $have -> $need"
+	display_xrandr_apply "$XRANDR" --fb "$need"
+}
+
+# Fingerprint of chrome-relevant layout: virtual screen + primary CRTC.
+# Same-resolution mirror on/off keeps this stable; extend desks do not
+display_layout_fingerprint()
+{
+	local pri="$1"
+	local screen geom
+
+	screen=$( display_screen_size )
+	geom=$( display_output_geometry "$pri" )
+
+	printf "%s|%s\n" "$screen" "$geom"
+}
+
+#
+# FVWM3 RandR handling can reset desk.pages to 1x1 even when the
+# virtual screen size is unchanged (same-res mirror). Re-assert the
+# configured grid without rebuilding taskbar or pager chrome.
+#
+display_fvwm_assert_desktop_size()
+{
+	local dx="${PAGER_DESK_X:-3}" dy="${PAGER_DESK_Y:-3}"
+	local sock_default="/tmp/fvwmmfl/fvwm_mfl_${DISPLAY:-:0}.sock"
+	local sock_alt=/tmp/fvwmmfl/fvwm_mfl_:0.sock
+	local sock="${FVWMMFL_SOCKET:-$sock_default}"
+
+	[ -S "$sock" ] || sock="$sock_alt"
+	if [ -S "$sock" ] && have FvwmCommand; then
+		FvwmCommand -f "$sock" "DesktopSize ${dx}x${dy}" \
+			>> "$LOG" 2>&1 ||
+			display_log "DesktopSize ${dx}x${dy} failed"
+		display_log "assert DesktopSize ${dx}x${dy}"
+	else
+		display_log "FvwmMFL missing; cannot assert DesktopSize"
+	fi
+}
+
+display_fvwm_refresh()
+{
+	local refresh_display_chrome=@PREFIX@/bin/fvwm-refresh-display-chrome
+
+	#
+	# Shrink ghost framebuffers before chrome reads geometry (arandr
+	# --off and laptop-only often leave Screen larger than any active
+	# CRTC).
+	#
+	display_xrandr_cache || : cache
+	display_normalize_framebuffer || : normalize
+
+	#
+	# Session bring-up defers the first chrome map to
+	# fvwm-deferred-chrome so FvwmPager is never auto-sized, then
+	# corrected.
+	#
+	if [ "${FVWM_DEFER_CHROME-}" ]; then
+		display_log "fvwm chrome deferred (FVWM_DEFER_CHROME set)"
+		return 0
+	fi
+	if [ -x "$refresh_display_chrome" ]; then
+		"$refresh_display_chrome" "$@" >> "$LOG" 2>&1 ||
+			display_log "${refresh_display_chrome##*/} failed"
+	fi
+}
+
+#
+# After RandR: rebuild FVWM chrome only when the virtual screen or
+# primary CRTC geometry changed. Same-res mirror toggles take the fast path
+#
+display_fvwm_refresh_after()
+{
+	local before="$1" primary="$2"
+	local after= try=0
+
+	#
+	# RandR can briefly report an empty layout right after outputs go
+	# --off; wait for a stable fingerprint before deciding.
+	#
+	while [ "$try" -lt 8 ]; do
+		display_xrandr_invalidate
+		display_xrandr_cache || : cache
+		after=$( display_layout_fingerprint "$primary" )
+		case "$after" in
+		''|'|'|*'|')
+			try=$(( $try + 1 ))
+			sleep 0.25
+			continue
+			;;
+		esac
+		break
+	done
+	if [ ! "$after" ] || [ "$after" = "|" ]; then
+		display_log "layout fingerprint still empty after wait;" \
+			"force fvwm chrome refresh"
+		display_fvwm_refresh
+		return 0
+	fi
+	if [ "$before" ] && [ "$before" = "$after" ]; then
+		display_log "layout unchanged ($after);" \
+			"skip fvwm chrome refresh"
+		display_fvwm_assert_desktop_size
+		return 0
+	fi
+	display_log "layout changed (${before:-none} -> $after);" \
+		"refresh fvwm chrome"
+	display_fvwm_refresh --if-needed
+}
+
+display_extend_position()
+{
+	[ -f "$STATE_EXTEND" ] && cat "$STATE_EXTEND" || : no extend
+}
+
+################################################################################
+# END
+################################################################################
