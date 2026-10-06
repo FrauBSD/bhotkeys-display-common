@@ -9,7 +9,7 @@
 #
 # $Title: RandR subroutines for laptop, mirror, and extend $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys-display-common/libexec/display-randr-common.subr.in 2026-10-03 19:50:53 -0700 Devin Teske $
+# $FrauBSD: bhotkeys-display-common/libexec/display-randr-common.subr.in 2026-10-05 21:46:53 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -292,8 +292,8 @@ display_mode_set()
 	printf "%s\n" "$1" > "$STATE_MODE"
 
 	# Greeter (root) must not leave root-owned mode files in the user cache
-	if [ "${MENU_HOTKEYS_GREETER-}${DISPLAY_GREETER-}" ] &&
-	   [ "${FLORENCE_GREETER_USER-}" ]
+	if [ "$BHOTKEYS_GREETER$DISPLAY_GREETER" ] &&
+	   [ "$FLORENCE_GREETER_USER" ]
 	then
 		chown "$FLORENCE_GREETER_USER:$FLORENCE_GREETER_USER" \
 			"$STATE_MODE" 2> /dev/null || : chown ignored
@@ -444,7 +444,7 @@ display_fvwm_refresh()
 	# fvwm-deferred-chrome so FvwmPager is never auto-sized, then
 	# corrected.
 	#
-	if [ "${FVWM_DEFER_CHROME-}" ]; then
+	if [ "$FVWM_DEFER_CHROME" ]; then
 		display_log "fvwm chrome deferred (FVWM_DEFER_CHROME set)"
 		return 0
 	fi

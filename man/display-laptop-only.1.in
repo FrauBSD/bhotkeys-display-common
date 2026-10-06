@@ -1,0 +1,49 @@
+.\" Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.Dd October 5, 2026
+.Dt DISPLAY-LAPTOP-ONLY 1
+.Os
+.Sh NAME
+.Nm display-laptop-only
+.Nd use the laptop panel and turn externals off
+.Sh SYNOPSIS
+.Nm
+.Op Fl Fl if-needed
+.Op Fl Fl quiet
+.Sh DESCRIPTION
+.Nm
+turns external RandR outputs off and leaves the internal panel.
+Use it after an external display is unplugged, or to leave extend
+or mirror.
+The glyph is
+.Xr bosd 1
+.Cm mirror-off .
+.Fl Fl quiet
+skips the glyph.
+.Pp
+With no options the panel is forced and the glyph is shown even
+when the layout is already the panel alone.
+.Fl Fl if-needed
+exits without changes when there is nothing to recover: no mirror
+or extend state, no external CRTC still programmed, and a screen
+size that already matches the panel.
+.Pp
+The shared RandR helpers are
+.Pa @PREFIX@/libexec/bhotkeys/display-randr-common.subr .
+.Sh EXIT STATUS
+.Nm
+exits 0 when the layout is applied or when
+.Fl Fl if-needed
+finds nothing to do.
+It exits 1 when
+.Xr xrandr 1
+fails or no internal output is found.
+A bad argument exits 2.
+.Sh SEE ALSO
+.Xr bhotkeys 1 ,
+.Xr bosd 1 ,
+.Xr xrandr 1
+.Sh AUTHORS
+.An Devin Teske Aq Mt dteske@FreeBSD.org

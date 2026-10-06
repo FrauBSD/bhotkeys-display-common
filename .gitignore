@@ -1,0 +1,3 @@
+bin/display-laptop-only
+libexec/display-randr-common.subr
+man/display-laptop-only.1

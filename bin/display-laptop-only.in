@@ -1,0 +1,172 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Force the laptop panel and turn externals off $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD: bhotkeys-display-common/bin/display-laptop-only.in 2026-10-05 21:46:53 -0700 Devin Teske $
+#
+############################################################ INFORMATION
+#
+# Force the laptop panel. Use after hot-unplugging an external
+# display.
+#
+#   display-laptop-only                always recover (+ OSD)
+#   display-laptop-only --if-needed    only when mirror, extend,
+#                                      or a ghost CRTC remains
+#   display-laptop-only --if-needed --quiet
+#       same, but no OSD (the caller already showed one)
+#
+############################################################ GLOBALS
+
+pgm="${0##*/}" # Program basename
+
+. "@PREFIX@/libexec/bhotkeys/display-randr-common.subr" || exit
+
+MODE=force
+QUIET=
+
+############################################################ FUNCTIONS
+
+usage()
+{
+	echo "Usage: $pgm [--if-needed] [--quiet]" >&2
+	exit 2
+}
+
+display_osd()
+{
+	local glyph="$1" secs="$2"
+
+	[ "$QUIET" ] && return 0
+	have bosd || return 0
+	bosd "$glyph" $secs &
+}
+
+needs_recovery()
+{
+	local primary="$1"
+	local connected= need= have= sw= pw=
+
+	connected=$( display_list_externals "$primary" )
+
+	#
+	# Hot-unplug or an active extend or mirror left behind: recover
+	# if a state file remains or an external CRTC is still programmed
+	# (including ghosts).
+	#
+	[ -f "$STATE_MIRROR" ] && return 0
+	[ -f "$STATE_EXTEND" ] && return 0
+	display_externals_active "$primary" && return 0
+
+	#
+	# Ghost framebuffer: outputs may still be connected (cable in)
+	# but inactive while Screen 0 stays at the old extend size.
+	# That inflates FVWM's page size past the laptop panel.
+	#
+	need=$( display_active_framebuffer_size )
+	have=$( display_screen_size )
+	[ "$need" ] && [ "$have" ] && [ "$need" != "$have" ] && return 0
+
+	# No plugged externals, but Screen wider than the panel
+	if [ ! "$connected" ]; then
+		sw=$( display_screen_width )
+		pw=$( display_primary_width "$primary" )
+		[ "$sw" ] && [ "$pw" ] && [ "$sw" -gt "$pw" ] && return 0
+	fi
+	return 1
+}
+
+############################################################ MAIN
+
+set -e
+
+for arg in "$@"; do
+	case "$arg" in
+	--if-needed) MODE=--if-needed ;;
+	--quiet) QUIET=1 ;;
+	''|force) : ok ;;
+	*) usage # NOTREACHED
+	esac
+done
+
+display_xrandr_cache || {
+	display_log "display-laptop-only: xrandr --query failed"
+	exit 1
+}
+
+primary=$( display_pick_primary )
+if [ ! "$primary" ]; then
+	display_log "display-laptop-only: no internal output"
+	exit 1
+fi
+
+[ "$MODE" = "--if-needed" ] && ! needs_recovery "$primary" &&
+	exit 0
+
+#
+# Menu "Use Laptop Display Only" always shows the single-display OSD
+# for feedback, even when already laptop-only. Hotplug (--if-needed)
+# shows it when we actually recover (unless --quiet).
+#
+display_osd mirror-off
+
+before=$( display_layout_fingerprint "$primary" )
+externals=$( display_list_all_externals "$primary" )
+geom=$( display_output_geometry "$primary" )
+mode=$( display_output_current_mode "$primary" )
+cmd="$XRANDR"
+changed=
+
+# Reprogram the panel only when it is not already at origin with a mode
+case "$geom" in
+*x*+0+0)
+	: leave eDP CRTC alone
+	;;
+*)
+	if [ "$mode" ]; then
+		cmd="$cmd --output $primary --primary --mode $mode --pos 0x0"
+	else
+		cmd="$cmd --output $primary --primary --auto --pos 0x0"
+	fi
+	changed=1
+esac
+for out in $externals; do
+	#
+	# Disable any programmed CRTC, including disconnected hot-unplug
+	# ghosts (geometry is now reported for those).
+	#
+	case "$( display_output_geometry "$out" )" in
+	'') : ok ;;
+	*)
+		cmd="$cmd --output $out --off"
+		changed=1
+	esac
+done
+if [ "$changed" ]; then
+	display_log "LAPTOP-ONLY: $cmd"
+	display_xrandr_apply $cmd
+else
+	display_log "LAPTOP-ONLY: already laptop-only (primary=$primary)"
+fi
+
+# --off does not always shrink Screen 0; force FB to the active CRTC box
+display_xrandr_cache || : cache
+display_normalize_framebuffer || : normalize
+display_clear_modes
+display_mode_set laptop
+
+# Same-res mirror off keeps layout; desk recovery still refreshes chrome
+display_fvwm_refresh_after "$before" "$primary"
+display_log "display-laptop-only complete (primary=$primary)"
+
+exit 0
+
+################################################################################
+# END
+################################################################################
