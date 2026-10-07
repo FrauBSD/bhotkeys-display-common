@@ -1,0 +1,61 @@
+.\" Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.Dd October 6, 2026
+.Dt DISPLAY-SESSION-RESTORE 1
+.Os
+.Sh NAME
+.Nm display-session-restore
+.Nd restore the saved display mode
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+replays the display mode saved in
+.Pa ~/.cache/display-mode .
+Any window manager can run it at session start.
+.Cm laptop
+runs
+.Xr display-laptop-only 1
+.Fl Fl quiet .
+.Cm mirror
+runs
+.Xr display-mirror-toggle 1
+.Fl Fl on Fl Fl quiet .
+.Cm extend:left ,
+.Cm extend:right ,
+and
+.Cm extend:above
+run
+.Xr display-extend 1
+with the matching position and
+.Fl Fl quiet .
+.Pp
+An empty mode, the mode
+.Cm layout ,
+or an unknown mode runs
+.Pa ~/.screenlayout/my-monitors.sh
+when that file is executable, records
+.Cm layout ,
+and pauses briefly before returning.
+.Pp
+The program returns when the helper finishes, so the caller can
+do its own aftercare.
+.Pp
+The shared RandR helpers are
+.Pa @PREFIX@/libexec/bhotkeys/display-randr-common.subr .
+.Sh EXIT STATUS
+.Nm
+exits 0 when the saved mode is applied or when there is no layout
+script to run.
+A failing helper exits with that helper's status.
+A bad argument exits 2.
+.Sh SEE ALSO
+.Xr bhotkeys 1 ,
+.Xr display-extend 1 ,
+.Xr display-laptop-only 1 ,
+.Xr display-mirror-toggle 1 ,
+.Xr xrandr 1
+.Sh AUTHORS
+.An Devin Teske Aq Mt dteske@FreeBSD.org

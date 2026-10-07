@@ -2,7 +2,7 @@
 .\"
 .\" SPDX-License-Identifier: BSD-2-Clause
 .\"
-.Dd October 5, 2026
+.Dd October 6, 2026
 .Dt DISPLAY-LAPTOP-ONLY 1
 .Os
 .Sh NAME
@@ -44,6 +44,7 @@ A bad argument exits 2.
 .Sh SEE ALSO
 .Xr bhotkeys 1 ,
 .Xr bosd 1 ,
+.Xr display-session-restore 1 ,
 .Xr xrandr 1
 .Sh AUTHORS
 .An Devin Teske Aq Mt dteske@FreeBSD.org

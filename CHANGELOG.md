@@ -1,10 +1,15 @@
-[//]: # ($FrauBSD: bhotkeys-display-common/CHANGELOG.md 2026-10-05 21:46:53 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys-display-common/CHANGELOG.md 2026-10-06 19:39:42 -0700 Devin Teske $)
 
 # Changelog
 
 Newest first. Each section is a git tag; the bullets are what landed
 in that tag (from the previous tag, or from the start of the
 repository for 1.0).
+
+## 1.2 (2026-10-06)
+
+- `display-session-restore` replays the mode saved in the previous session
+- man page for `display-session-restore`
 
 ## 1.1 (2026-10-05)
 

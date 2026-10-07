@@ -9,12 +9,12 @@
 #
 # $Title: RandR subroutines for laptop, mirror, and extend $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys-display-common/libexec/display-randr-common.subr.in 2026-10-05 21:46:53 -0700 Devin Teske $
+# $FrauBSD: bhotkeys-display-common/libexec/display-randr-common.subr.in 2026-10-06 19:39:42 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
 # Shared RandR helpers for display-mirror-toggle, display-extend,
-# and display-laptop-only. Sourced from
+# display-laptop-only, and display-session-restore. Sourced from
 # @PREFIX@/libexec/bhotkeys/display-randr-common.subr.
 #
 ############################################################ CONFIG

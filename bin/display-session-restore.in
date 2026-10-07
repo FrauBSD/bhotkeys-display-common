@@ -1,0 +1,82 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Restore the saved display mode $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD: bhotkeys-display-common/bin/display-session-restore.in 2026-10-06 19:39:42 -0700 Devin Teske $
+#
+############################################################ INFORMATION
+#
+# Replay the display mode saved in the previous session.
+# With no saved mode, run ~/.screenlayout/my-monitors.sh
+# when that file is executable.
+#
+############################################################ GLOBALS
+
+pgm="${0##*/}" # Program basename
+
+. "@PREFIX@/libexec/bhotkeys/display-randr-common.subr" || exit
+
+############################################################ FUNCTIONS
+
+usage()
+{
+	echo "Usage: $pgm" >&2
+	exit 2
+}
+
+apply_saved_layout()
+{
+	local script="$HOME/.screenlayout/my-monitors.sh"
+
+	[ -x "$script" ] || return 0
+	"$script"
+	display_mode_set layout
+	# Pause so the caller can map chrome after the layout script
+	sleep 0.5
+}
+
+############################################################ MAIN
+
+set -e
+
+[ $# -eq 0 ] || usage # NOTREACHED
+
+mode=$( display_mode_get )
+display_log "display-session-restore: mode=${mode:-layout(default)}"
+
+#
+# Call the helper and return. The caller does its own aftercare.
+#
+case "$mode" in
+laptop)
+	# No OSD on session bring-up; the user did not press a display key
+	display-laptop-only --quiet
+	;;
+mirror)
+	display-mirror-toggle --on --quiet
+	;;
+extend:left|extend:right|extend:above)
+	pos="${mode#extend:}"
+	display-extend "--$pos" --quiet
+	;;
+layout|'')
+	apply_saved_layout
+	;;
+*)
+	display_log "display-session-restore: unknown mode '$mode'; use layout"
+	apply_saved_layout
+	;;
+esac
+
+exit 0
+
+################################################################################
+# END
+################################################################################

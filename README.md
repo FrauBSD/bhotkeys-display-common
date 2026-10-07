@@ -1,10 +1,11 @@
-[//]: # ($FrauBSD: bhotkeys-display-common/README.md 2026-10-05 21:46:53 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys-display-common/README.md 2026-10-06 19:39:42 -0700 Devin Teske $)
 
 # bhotkeys-display-common
 
 Shared RandR subroutines for laptop, mirror, and extend layouts.
 `display-laptop-only` turns external outputs off and leaves the
-internal panel.
+internal panel. `display-session-restore` replays the mode saved
+in the previous session.
 
 Home: [FrauBSD/bhotkeys-display-common](https://github.com/FrauBSD/bhotkeys-display-common)
 
@@ -15,5 +16,5 @@ make install    # PREFIX=/usr/local by default
 ```
 
 Installs `display-randr-common.subr` into
-`${PREFIX}/libexec/bhotkeys`, and `display-laptop-only` into
-`${PREFIX}/bin`.
+`${PREFIX}/libexec/bhotkeys`. `display-laptop-only` and
+`display-session-restore` go into `${PREFIX}/bin`.

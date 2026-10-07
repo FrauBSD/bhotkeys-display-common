@@ -1,3 +1,5 @@
 bin/display-laptop-only
+bin/display-session-restore
 libexec/display-randr-common.subr
 man/display-laptop-only.1
+man/display-session-restore.1
